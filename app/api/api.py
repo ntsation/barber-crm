@@ -6,6 +6,7 @@ from app.api import (
     barbershop_profile_router,
     barbershop_schedule_router,
     barbershop_settings_router,
+    service_router,
 )
 
 api_router = APIRouter()
@@ -31,3 +32,4 @@ api_router.include_router(
     prefix="/barbershop-settings",
     tags=["barbershop-settings"],
 )
+api_router.include_router(service_router.router, prefix="/services", tags=["services"])
