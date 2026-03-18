@@ -5,9 +5,9 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Instala dependências do sistema
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+# Instala dependências do sistema (com retry em caso de falha de rede)
+RUN apt-get update || apt-get update && \
+    apt-get install -y --no-install-recommends \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
