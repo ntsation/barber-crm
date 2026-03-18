@@ -66,3 +66,40 @@ def test_abstract_barbershop_repository_methods(db):
     assert mock_repo.update(1, None) is None
     assert mock_repo.soft_delete(1) is False
     assert mock_repo.restore(1) is None
+
+
+def test_abstract_customer_repository_methods(db):
+    from app.repositories.customer_repository import ICustomerRepository
+
+    class MockCustomerRepository(ICustomerRepository):
+        def get_by_id(self, id: int):
+            return None
+
+        def get_by_barbershop(
+            self, barbershop_id: int, skip: int = 0, limit: int = 100
+        ):
+            return []
+
+        def get_by_email(self, email: str):
+            return None
+
+        def create(self, customer):
+            return None
+
+        def update(self, id: int, customer):
+            return None
+
+        def soft_delete(self, id: int):
+            return False
+
+        def restore(self, id: int):
+            return None
+
+    mock_repo = MockCustomerRepository()
+    assert mock_repo.get_by_id(1) is None
+    assert mock_repo.get_by_barbershop(1) == []
+    assert mock_repo.get_by_email("test@test.com") is None
+    assert mock_repo.create(None) is None
+    assert mock_repo.update(1, None) is None
+    assert mock_repo.soft_delete(1) is False
+    assert mock_repo.restore(1) is None

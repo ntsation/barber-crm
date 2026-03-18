@@ -16,6 +16,13 @@ def test_barbershop_repository_is_abstract(db):
     assert hasattr(IBarberShopRepository, "__abstractmethods__")
 
 
+def test_customer_repository_is_abstract(db):
+    from app.repositories.customer_repository import ICustomerRepository
+
+    assert issubclass(ICustomerRepository, ABC)
+    assert hasattr(ICustomerRepository, "__abstractmethods__")
+
+
 def test_base_class_tablename(db):
     from app.db.base_class import Base
 
