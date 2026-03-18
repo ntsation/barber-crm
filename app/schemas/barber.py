@@ -1,6 +1,25 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List
+
+
+class WorkingHoursSlot(BaseModel):
+    start_time: str
+    end_time: str
+
+    @field_validator('start_time', 'end_time')
+    @classmethod
+    def validate_time_format(cls, v: str) -> str:
+        if v:
+            import re
+            if not re.match(r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$', v):
+                raise ValueError('Time must be in HH:MM format')
+        return v
+
+
+class WorkingDaySchedule(BaseModel):
+    enabled: bool = True
+    slots: List[WorkingHoursSlot] = []
 
 
 class BarberBase(BaseModel):
@@ -10,7 +29,7 @@ class BarberBase(BaseModel):
     phone: Optional[str] = None
     is_active: Optional[bool] = True
     working_days: Optional[List[str]] = None
-    working_hours: Optional[Dict[str, str]] = None
+    working_hours: Optional[WorkingDaySchedule] = None
 
 
 class BarberCreate(BarberBase):
@@ -25,7 +44,7 @@ class BarberUpdate(BaseModel):
     phone: Optional[str] = None
     is_active: Optional[bool] = None
     working_days: Optional[List[str]] = None
-    working_hours: Optional[Dict[str, str]] = None
+    working_hours: Optional[WorkingDaySchedule] = None
 
 
 class Barber(BarberBase):

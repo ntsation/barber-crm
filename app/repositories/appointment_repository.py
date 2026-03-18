@@ -1,6 +1,7 @@
 from typing import Optional, List
 from abc import ABC, abstractmethod
-from sqlalchemy import func
+from datetime import date as date_type
+from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 from app.models.appointment import Appointment as AppointmentModel
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
@@ -31,6 +32,23 @@ class IAppointmentRepository(ABC):
 
     @abstractmethod
     def get_by_date(self, date: str, barbershop_id: int) -> List[AppointmentModel]:
+        pass  # pragma: no cover
+
+    @abstractmethod
+    def get_by_barber_and_date(
+        self, barber_id: int, date: date_type
+    ) -> List[AppointmentModel]:
+        pass  # pragma: no cover
+
+    @abstractmethod
+    def has_conflicting_appointment(
+        self,
+        barber_id: int,
+        date: date_type,
+        start_time: str,
+        end_time: str,
+        exclude_id: Optional[int] = None,
+    ) -> bool:
         pass  # pragma: no cover
 
     @abstractmethod
@@ -102,6 +120,61 @@ class AppointmentRepository(IAppointmentRepository):
             .order_by(AppointmentModel.scheduled_time)
             .all()
         )
+
+    def get_by_barber_and_date(
+        self, barber_id: int, date: date_type
+    ) -> List[AppointmentModel]:
+        return (
+            self.db.query(AppointmentModel)
+            .filter(
+                AppointmentModel.barber_id == barber_id,
+                func.date(AppointmentModel.scheduled_date) == date,
+                AppointmentModel.status.notin_(["cancelled", "no_show"]),
+            )
+            .order_by(AppointmentModel.scheduled_time)
+            .all()
+        )
+
+    def has_conflicting_appointment(
+        self,
+        barber_id: int,
+        date: date_type,
+        start_time: str,
+        end_time: str,
+        exclude_id: Optional[int] = None,
+    ) -> bool:
+        from datetime import datetime, timedelta
+
+        # Get all appointments for this barber on this date
+        appointments = self.db.query(AppointmentModel).filter(
+            AppointmentModel.barber_id == barber_id,
+            func.date(AppointmentModel.scheduled_date) == date,
+            AppointmentModel.status.notin_(["cancelled", "no_show"]),
+        )
+
+        if exclude_id:
+            appointments = appointments.filter(AppointmentModel.id != exclude_id)
+
+        appointments = appointments.all()
+
+        # Check for conflicts in Python
+        for appt in appointments:
+            appt_start = appt.scheduled_time
+            # Assume default 30 min duration if not specified
+            appt_duration = getattr(appt, 'duration_minutes', 30) or 30
+            appt_end = self._add_minutes_to_time(appt_start, appt_duration)
+
+            # Check if there's an overlap
+            if appt_start < end_time and appt_end > start_time:
+                return True
+
+        return False
+
+    def _add_minutes_to_time(self, time_str: str, minutes: int) -> str:
+        from datetime import datetime, timedelta
+        time_obj = datetime.strptime(time_str, "%H:%M")
+        new_time = time_obj + timedelta(minutes=minutes)
+        return new_time.strftime("%H:%M")
 
     def create(self, appointment: AppointmentCreate) -> AppointmentModel:
         db_appointment = AppointmentModel(**appointment.model_dump())
