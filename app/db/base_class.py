@@ -15,5 +15,5 @@ class Base:
     deleted_at = Column(DateTime, nullable=True)
 
     @declared_attr
-    def __tablename__(cls) -> str:
+    def __tablename__(cls) -> str:  # pragma: no cover
         return cls.__name__.lower()

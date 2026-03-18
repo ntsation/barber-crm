@@ -9,31 +9,31 @@ from app.schemas.user import UserCreate, UserUpdate
 class IUserRepository(ABC):
     @abstractmethod
     def get_by_email(self, email: str) -> Optional[UserModel]:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def get_by_id(self, id: int) -> Optional[UserModel]:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def get_all(self, skip: int = 0, limit: int = 100) -> List[UserModel]:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def create(self, user: UserCreate) -> UserModel:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def update(self, id: int, user: UserUpdate) -> Optional[UserModel]:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def soft_delete(self, id: int) -> bool:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def restore(self, id: int) -> Optional[UserModel]:
-        pass
+        pass  # pragma: no cover
 
 
 class UserRepository(IUserRepository):

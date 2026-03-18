@@ -9,31 +9,31 @@ from app.schemas.barbershop import BarberShopCreate, BarberShopUpdate
 class IBarberShopRepository(ABC):
     @abstractmethod
     def get_by_id(self, id: int) -> Optional[BarberShopModel]:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def get_by_owner(
         self, owner_id: int, skip: int = 0, limit: int = 100
     ) -> List[BarberShopModel]:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def create(self, barbershop: BarberShopCreate) -> BarberShopModel:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def update(
         self, id: int, barbershop: BarberShopUpdate
     ) -> Optional[BarberShopModel]:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def soft_delete(self, id: int) -> bool:
-        pass
+        pass  # pragma: no cover
 
     @abstractmethod
     def restore(self, id: int) -> Optional[BarberShopModel]:
-        pass
+        pass  # pragma: no cover
 
 
 class BarberShopRepository(IBarberShopRepository):
