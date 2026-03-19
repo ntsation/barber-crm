@@ -52,8 +52,8 @@ COPY --from=builder /opt/venv /opt/venv
 # Copy application code
 COPY app/ ./app/
 COPY init_db.py .
-COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app && \
@@ -68,7 +68,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 
 
 # Stage 3: Development (for local development with hot reload)
@@ -80,7 +80,7 @@ WORKDIR /app
 RUN pip install watchdog
 
 # Copy application code
-COPY . .
+COPY . /app/
 
 # Install netcat for entrypoint
 RUN apt-get update && \
@@ -88,10 +88,10 @@ RUN apt-get update && \
     netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
-RUN chmod +x entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Expose port
 EXPOSE 8000
 
 # Run with reload for development
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
