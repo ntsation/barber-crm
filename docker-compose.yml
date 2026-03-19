@@ -1,5 +1,6 @@
 services:
   api:
+    platform: linux/amd64
     build:
       context: .
       target: development
@@ -27,6 +28,7 @@ services:
       start_period: 10s
 
   db:
+    platform: linux/amd64
     image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
