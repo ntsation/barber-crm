@@ -12,7 +12,18 @@ from app.schemas.customer import CustomerCreate
 from app.schemas.barber import BarberCreate
 from app.schemas.service import ServiceCreate
 from app.schemas.appointment import AppointmentCreate
-from datetime import datetime
+from datetime import datetime, timedelta
+
+
+def get_future_date(days=1):
+    """Helper to get a future datetime for appointments."""
+    from datetime import time
+    future = datetime.now() + timedelta(days=days)
+    # Ensure we return a Monday (weekday 0) to match test expectations
+    days_until_monday = (7 - future.weekday()) % 7
+    if days_until_monday > 0:
+        future = future + timedelta(days=days_until_monday)
+    return datetime.combine(future.date(), time(12, 0))
 
 
 def test_create_appointment(client, db):
@@ -52,13 +63,14 @@ def test_create_appointment(client, db):
         )
     )
 
+    future_date = get_future_date()
     appointment_data = {
         "barbershop_id": barbershop.id,
         "customer_id": customer.id,
         "barber_id": barber.id,
         "service_id": service.id,
-        "scheduled_date": "2024-01-01T10:00:00",
-        "scheduled_time": "10:00",
+        "scheduled_date": future_date.isoformat(),
+        "scheduled_time": "12:00",
         "status": "pending",
     }
 
@@ -127,7 +139,7 @@ def test_get_appointment(client, db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
+        scheduled_date=get_future_date(),
         scheduled_time="10:00",
     )
     appointment = appointment_repo.create(appointment_data)
@@ -189,7 +201,7 @@ def test_get_barbershop_appointments(client, db):
             customer_id=customer.id,
             barber_id=barber.id,
             service_id=service.id,
-            scheduled_date=datetime(2024, 1, 1, 10, 0),
+            scheduled_date=get_future_date(),
             scheduled_time="10:00",
         )
     )
@@ -245,7 +257,7 @@ def test_get_barbershop_appointments_with_status(client, db):
             customer_id=customer.id,
             barber_id=barber.id,
             service_id=service.id,
-            scheduled_date=datetime(2024, 1, 1, 10, 0),
+            scheduled_date=get_future_date(),
             scheduled_time="10:00",
             status="confirmed",
         )
@@ -305,7 +317,7 @@ def test_get_customer_appointments(client, db):
             customer_id=customer.id,
             barber_id=barber.id,
             service_id=service.id,
-            scheduled_date=datetime(2024, 1, 1, 10, 0),
+            scheduled_date=get_future_date(),
             scheduled_time="10:00",
         )
     )
@@ -367,7 +379,7 @@ def test_get_barber_appointments(client, db):
             customer_id=customer.id,
             barber_id=barber.id,
             service_id=service.id,
-            scheduled_date=datetime(2024, 1, 1, 10, 0),
+            scheduled_date=get_future_date(),
             scheduled_time="10:00",
         )
     )
@@ -428,7 +440,7 @@ def test_update_appointment(client, db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
+        scheduled_date=get_future_date(),
         scheduled_time="10:00",
     )
     appointment = appointment_repo.create(appointment_data)
@@ -485,7 +497,7 @@ def test_update_appointment_invalid_status(client, db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
+        scheduled_date=get_future_date(),
         scheduled_time="10:00",
     )
     appointment = appointment_repo.create(appointment_data)
@@ -548,7 +560,7 @@ def test_delete_appointment(client, db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
+        scheduled_date=get_future_date(),
         scheduled_time="10:00",
     )
     appointment = appointment_repo.create(appointment_data)

@@ -1,7 +1,19 @@
 """Tests for appointment validation features."""
 import pytest
 from fastapi import HTTPException
-from datetime import datetime
+from datetime import datetime, timedelta
+
+
+def get_future_date(days=1, hour=12, minute=0):
+    """Helper to get a future datetime for appointments."""
+    from datetime import time
+    future = datetime.now() + timedelta(days=days)
+    # Ensure we return a Monday (weekday 0) to match test expectations
+    # Add days to get to next Monday if needed
+    days_until_monday = (7 - future.weekday()) % 7
+    if days_until_monday > 0:
+        future = future + timedelta(days=days_until_monday)
+    return datetime.combine(future.date(), time(hour, minute))
 
 from app.services.appointment_service import AppointmentService
 from app.repositories.appointment_repository import AppointmentRepository
@@ -98,8 +110,8 @@ def test_create_appointment_inactive_barber(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),  # Monday
+        scheduled_time="12:00",
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -124,7 +136,7 @@ def test_create_appointment_barber_not_working_day(db):
         barber_id=barber.id,
         service_id=service.id,
         scheduled_date=datetime(2024, 1, 2, 10, 0),  # Tuesday
-        scheduled_time="10:00",
+        scheduled_time="12:00",
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -153,7 +165,7 @@ def test_create_appointment_barber_outside_working_hours(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
+        scheduled_date=get_future_date(hour=18),  # Monday 18:00
         scheduled_time="18:00",
     )
 
@@ -183,8 +195,8 @@ def test_create_appointment_barber_within_working_hours(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),  # Monday
+        scheduled_time="12:00",
     )
 
     appointment = appointment_service.create_appointment(appointment_data)
@@ -205,8 +217,8 @@ def test_create_appointment_conflict_same_time(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),
+        scheduled_time="12:00",
     )
     appointment_service.create_appointment(appointment_data)
 
@@ -226,8 +238,8 @@ def test_create_appointment_conflict_same_time(db):
         customer_id=customer2.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),
+        scheduled_time="12:00",
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -242,18 +254,18 @@ def test_create_appointment_conflict_overlapping(db):
     barbershop, customer, barber, service = create_test_data(db)
     appointment_service = get_service(db)
 
-    # Create first appointment at 10:00 (30 min service = ends at 10:30)
+    # Create first appointment at 12:00 (30 min service = ends at 12:30)
     appointment_data = AppointmentCreate(
         barbershop_id=barbershop.id,
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),
+        scheduled_time="12:00",
     )
     appointment_service.create_appointment(appointment_data)
 
-    # Try to create second appointment at 10:15 (overlaps)
+    # Try to create second appointment at 12:15 (overlaps)
     customer2_repo = CustomerRepository(db)
     customer2 = customer2_repo.create(
         CustomerCreate(
@@ -269,8 +281,8 @@ def test_create_appointment_conflict_overlapping(db):
         customer_id=customer2.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
-        scheduled_time="10:15",
+        scheduled_date=get_future_date(hour=12, minute=15),
+        scheduled_time="12:15",
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -290,8 +302,8 @@ def test_create_appointment_no_conflict_different_times(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),
+        scheduled_time="12:00",
     )
     appointment_service.create_appointment(appointment_data)
 
@@ -311,7 +323,7 @@ def test_create_appointment_no_conflict_different_times(db):
         customer_id=customer2.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
+        scheduled_date=get_future_date(hour=11),
         scheduled_time="11:00",
     )
 
@@ -331,8 +343,8 @@ def test_create_appointment_no_conflict_cancelled_appointment(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),
+        scheduled_time="12:00",
         status="cancelled",
     )
     appointment_repo.create(appointment_data)
@@ -353,8 +365,8 @@ def test_create_appointment_no_conflict_cancelled_appointment(db):
         customer_id=customer2.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),
+        scheduled_time="12:00",
     )
 
     appointment2 = appointment_service.create_appointment(new_data)
@@ -391,7 +403,7 @@ def test_create_appointment_barbershop_closed(db):
         barber_id=barber.id,
         service_id=service.id,
         scheduled_date=datetime(2024, 1, 7, 10, 0),  # Sunday
-        scheduled_time="10:00",
+        scheduled_time="12:00",
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -421,8 +433,8 @@ def test_create_appointment_outside_barbershop_hours(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
-        scheduled_time="08:00",  # Before opening
+        scheduled_date=get_future_date(hour=8),  # Before opening
+        scheduled_time="08:00",
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -452,8 +464,8 @@ def test_create_appointment_within_barbershop_hours(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),  # Monday
+        scheduled_time="12:00",
     )
 
     appointment = appointment_service.create_appointment(appointment_data)
@@ -486,7 +498,7 @@ def test_create_appointment_during_break_time(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
+        scheduled_date=get_future_date(hour=12, minute=15),
         scheduled_time="12:15",
     )
 
@@ -523,8 +535,8 @@ def test_create_appointment_barber_schedule_not_available(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),  # Monday
+        scheduled_time="12:00",
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -557,7 +569,7 @@ def test_create_appointment_barber_schedule_outside_hours(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
+        scheduled_date=get_future_date(hour=14),
         scheduled_time="14:00",
     )
 
@@ -591,8 +603,8 @@ def test_create_appointment_barber_schedule_valid(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),  # Monday
+        scheduled_time="12:00",
     )
 
     appointment = appointment_service.create_appointment(appointment_data)
@@ -620,7 +632,7 @@ def test_create_appointment_barbershop_schedule_day_not_defined(db):
         barber_id=barber.id,
         service_id=service.id,
         scheduled_date=datetime(2024, 1, 2, 10, 0),  # Tuesday
-        scheduled_time="10:00",
+        scheduled_time="12:00",
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -650,8 +662,8 @@ def test_create_appointment_barbershop_schedule_no_hours_defined(db):
         customer_id=customer.id,
         barber_id=barber.id,
         service_id=service.id,
-        scheduled_date=datetime(2024, 1, 1, 10, 0),  # Monday
-        scheduled_time="10:00",
+        scheduled_date=get_future_date(),  # Monday
+        scheduled_time="12:00",
     )
 
     with pytest.raises(HTTPException) as exc_info:

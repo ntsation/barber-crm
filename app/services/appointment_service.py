@@ -88,6 +88,11 @@ class AppointmentService:
             end_time,
         )
 
+        # Validate appointment time constraints
+        self._validate_appointment_time_constraints(
+            appointment_in.scheduled_date, appointment_time
+        )
+
         return self.appointment_repo.create(appointment_in)
 
     def get_appointment(self, appointment_id: int) -> AppointmentModel:
@@ -271,4 +276,34 @@ class AppointmentService:
             raise HTTPException(
                 status_code=400,
                 detail="Barber already has an appointment at this time"
+            )
+
+    def _validate_appointment_time_constraints(
+        self, scheduled_date: datetime, scheduled_time: str
+    ):
+        """Validate appointment time constraints.
+        
+        - Minimum advance notice: 1 hour
+        - Maximum advance notice: 30 days
+        """
+        # Combine date and time into a single datetime
+        time_obj = datetime.strptime(scheduled_time, "%H:%M").time()
+        appointment_datetime = datetime.combine(scheduled_date.date(), time_obj)
+        
+        now = datetime.now()
+        
+        # Check minimum advance notice (1 hour)
+        min_advance_time = now + timedelta(hours=1)
+        if appointment_datetime < min_advance_time:
+            raise HTTPException(
+                status_code=400,
+                detail="Appointments must be scheduled at least 1 hour in advance"
+            )
+        
+        # Check maximum advance notice (30 days)
+        max_advance_time = now + timedelta(days=30)
+        if appointment_datetime > max_advance_time:
+            raise HTTPException(
+                status_code=400,
+                detail="Appointments cannot be scheduled more than 30 days in advance"
             )
