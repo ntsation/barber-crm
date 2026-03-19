@@ -1,0 +1,15 @@
+# Force LF line endings for shell scripts
+*.sh text eol=lf
+
+# Force LF for other text files that may cause issues
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Ensure Dockerfile always uses LF
+Dockerfile text eol=lf
+
+# Ensure requirements.txt uses LF
+requirements.txt text eol=lf

@@ -53,7 +53,8 @@ COPY --from=builder /opt/venv /opt/venv
 COPY app/ ./app/
 COPY init_db.py .
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
+# Convert Windows line endings (CRLF) to Unix (LF) and make executable
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app && \
@@ -88,7 +89,8 @@ RUN apt-get update && \
     netcat-traditional \
     && rm -rf /var/lib/apt/lists/*
 
-RUN chmod +x /app/entrypoint.sh
+# Convert Windows line endings (CRLF) to Unix (LF) and make executable
+RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 
 # Expose port
 EXPOSE 8000
