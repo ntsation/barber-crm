@@ -52,10 +52,11 @@ COPY --from=builder /opt/venv /opt/venv
 # Copy application code
 COPY app/ ./app/
 COPY init_db.py .
+COPY entrypoint.sh /entrypoint.sh
 COPY entrypoint.sh /app/entrypoint.sh
 # Convert Windows line endings (CRLF) to Unix (LF) and make executable
 RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
-
+RUN chmod +x /entrypoint.sh
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app && \
     chown -R app:app /app
@@ -69,7 +70,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/bin/sh", "-c", "/app/entrypoint.sh"]
 
 
 # Stage 3: Development (for local development with hot reload)
@@ -96,4 +97,4 @@ RUN sed -i 's/\r$//' /app/entrypoint.sh && chmod +x /app/entrypoint.sh
 EXPOSE 8000
 
 # Run with reload for development
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/bin/sh","-c", "/app/entrypoint.sh"]
