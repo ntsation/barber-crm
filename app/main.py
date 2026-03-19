@@ -7,9 +7,11 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.api import api_router
 from app.api.health_router import router as health_router
+from app.api.audit_router import router as audit_router
 from app.core.config import settings
 from app.core.logging import setup_logging
 from app.core.middleware import LoggingMiddleware, SecurityHeadersMiddleware
+from app.core.audit_middleware import AuditMiddleware
 
 # Setup logging
 setup_logging(level="INFO", format_type="structured")
@@ -33,6 +35,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # Add middlewares
 app.add_middleware(LoggingMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(AuditMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Configure appropriately for production
@@ -43,6 +46,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(health_router)
+app.include_router(audit_router, prefix="/api/audit", tags=["audit"])
 app.include_router(api_router, prefix="/api")
 
 

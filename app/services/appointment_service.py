@@ -1,4 +1,6 @@
 from datetime import datetime, timedelta
+from typing import Optional, List, Dict, Any
+
 from app.repositories.appointment_repository import IAppointmentRepository
 from app.repositories.barbershop_repository import IBarberShopRepository
 from app.repositories.customer_repository import ICustomerRepository
@@ -6,10 +8,12 @@ from app.repositories.barber_repository import IBarberRepository
 from app.repositories.service_repository import IServiceRepository
 from app.repositories.barbershop_schedule_repository import IBarberShopScheduleRepository
 from app.repositories.barber_schedule_repository import IBarberScheduleRepository
+from app.repositories.audit_log_repository import IAuditLogRepository
 from app.schemas.appointment import AppointmentCreate, AppointmentUpdate
 from app.models.appointment import Appointment as AppointmentModel
 from fastapi import HTTPException
-from typing import List
+
+from app.core.audit_middleware import get_current_user_info
 
 
 class AppointmentService:
@@ -22,6 +26,8 @@ class AppointmentService:
         service_repo: IServiceRepository,
         barbershop_schedule_repo: IBarberShopScheduleRepository = None,
         barber_schedule_repo: IBarberScheduleRepository = None,
+        audit_repo: IAuditLogRepository = None,
+        request_info: Optional[Dict[str, str]] = None,
     ):
         self.appointment_repo = appointment_repo
         self.barbershop_repo = barbershop_repo
@@ -30,6 +36,8 @@ class AppointmentService:
         self.service_repo = service_repo
         self.barbershop_schedule_repo = barbershop_schedule_repo
         self.barber_schedule_repo = barber_schedule_repo
+        self.audit_repo = audit_repo
+        self.request_info = request_info or {}
 
     def create_appointment(self, appointment_in: AppointmentCreate) -> AppointmentModel:
         barbershop = self.barbershop_repo.get_by_id(appointment_in.barbershop_id)
@@ -93,12 +101,39 @@ class AppointmentService:
             appointment_in.scheduled_date, appointment_time
         )
 
-        return self.appointment_repo.create(appointment_in)
+        # Create the appointment
+        appointment = self.appointment_repo.create(appointment_in)
+
+        # Log audit
+        self._log_create(
+            entity_type="appointment",
+            entity_id=appointment.id,
+            new_values={
+                "barbershop_id": appointment.barbershop_id,
+                "customer_id": appointment.customer_id,
+                "barber_id": appointment.barber_id,
+                "service_id": appointment.service_id,
+                "scheduled_date": appointment.scheduled_date.isoformat() if appointment.scheduled_date else None,
+                "scheduled_time": appointment.scheduled_time,
+                "status": appointment.status,
+                "total_price": appointment.total_price,
+            },
+            description=f"Created appointment for customer {customer.name} with barber {barber.name}",
+        )
+
+        return appointment
 
     def get_appointment(self, appointment_id: int) -> AppointmentModel:
         appointment = self.appointment_repo.get_by_id(appointment_id)
         if not appointment:
             raise HTTPException(status_code=404, detail="Appointment not found")
+        
+        # Log view audit
+        self._log_view(
+            entity_type="appointment",
+            entity_id=appointment_id,
+        )
+        
         return appointment
 
     def get_barbershop_appointments(
@@ -133,6 +168,12 @@ class AppointmentService:
         if not appointment:
             raise HTTPException(status_code=404, detail="Appointment not found")
 
+        # Store old values for audit
+        old_values = {
+            "status": appointment.status,
+            "notes": appointment.notes,
+        }
+
         if appointment_in.status:
             valid_statuses = [
                 "pending",
@@ -145,14 +186,51 @@ class AppointmentService:
             if appointment_in.status not in valid_statuses:
                 raise HTTPException(status_code=400, detail="Invalid status")
 
-        return self.appointment_repo.update(appointment_id, appointment_in)
+        updated = self.appointment_repo.update(appointment_id, appointment_in)
+
+        # Log audit
+        new_values = {
+            "status": updated.status,
+            "notes": updated.notes,
+        }
+        self._log_update(
+            entity_type="appointment",
+            entity_id=appointment_id,
+            old_values=old_values,
+            new_values=new_values,
+            description=f"Updated appointment {appointment_id}",
+        )
+
+        return updated
 
     def delete_appointment(self, appointment_id: int) -> bool:
         appointment = self.appointment_repo.get_by_id(appointment_id)
         if not appointment:
             raise HTTPException(status_code=404, detail="Appointment not found")
 
-        return self.appointment_repo.delete(appointment_id)
+        # Store old values for audit
+        old_values = {
+            "barbershop_id": appointment.barbershop_id,
+            "customer_id": appointment.customer_id,
+            "barber_id": appointment.barber_id,
+            "service_id": appointment.service_id,
+            "scheduled_date": appointment.scheduled_date.isoformat() if appointment.scheduled_date else None,
+            "scheduled_time": appointment.scheduled_time,
+            "status": appointment.status,
+            "total_price": appointment.total_price,
+        }
+
+        result = self.appointment_repo.delete(appointment_id)
+
+        # Log audit
+        self._log_delete(
+            entity_type="appointment",
+            entity_id=appointment_id,
+            old_values=old_values,
+            description=f"Deleted appointment {appointment_id}",
+        )
+
+        return result
 
     def _add_minutes_to_time(self, time_str: str, minutes: int) -> str:
         """Add minutes to a time string in HH:MM format."""
@@ -307,3 +385,128 @@ class AppointmentService:
                 status_code=400,
                 detail="Appointments cannot be scheduled more than 30 days in advance"
             )
+
+    # Audit logging methods
+    def _log_create(
+        self,
+        entity_type: str,
+        entity_id: int,
+        new_values: Dict[str, Any],
+        description: Optional[str] = None,
+    ):
+        """Log CREATE operation."""
+        if not self.audit_repo:
+            return
+
+        user_id, user_email = get_current_user_info()
+        
+        from app.schemas.audit_log import AuditLogCreate
+        audit_data = AuditLogCreate(
+            action="CREATE",
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_id=user_id,
+            user_email=user_email,
+            new_values=new_values,
+            description=description or f"Created {entity_type} with id {entity_id}",
+            **self.request_info,
+        )
+        self.audit_repo.create(audit_data)
+
+    def _log_update(
+        self,
+        entity_type: str,
+        entity_id: int,
+        old_values: Dict[str, Any],
+        new_values: Dict[str, Any],
+        description: Optional[str] = None,
+    ):
+        """Log UPDATE operation."""
+        if not self.audit_repo:
+            return
+
+        user_id, user_email = get_current_user_info()
+        changes = self._calculate_changes(old_values, new_values)
+        
+        from app.schemas.audit_log import AuditLogCreate
+        audit_data = AuditLogCreate(
+            action="UPDATE",
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_id=user_id,
+            user_email=user_email,
+            old_values=old_values,
+            new_values=new_values,
+            changes=changes,
+            description=description or f"Updated {entity_type} with id {entity_id}",
+            **self.request_info,
+        )
+        self.audit_repo.create(audit_data)
+
+    def _log_delete(
+        self,
+        entity_type: str,
+        entity_id: int,
+        old_values: Dict[str, Any],
+        description: Optional[str] = None,
+    ):
+        """Log DELETE operation."""
+        if not self.audit_repo:
+            return
+
+        user_id, user_email = get_current_user_info()
+        
+        from app.schemas.audit_log import AuditLogCreate
+        audit_data = AuditLogCreate(
+            action="DELETE",
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_id=user_id,
+            user_email=user_email,
+            old_values=old_values,
+            description=description or f"Deleted {entity_type} with id {entity_id}",
+            **self.request_info,
+        )
+        self.audit_repo.create(audit_data)
+
+    def _log_view(
+        self,
+        entity_type: str,
+        entity_id: int,
+    ):
+        """Log VIEW operation."""
+        if not self.audit_repo:
+            return
+
+        user_id, user_email = get_current_user_info()
+        
+        from app.schemas.audit_log import AuditLogCreate
+        audit_data = AuditLogCreate(
+            action="VIEW",
+            entity_type=entity_type,
+            entity_id=entity_id,
+            user_id=user_id,
+            user_email=user_email,
+            description=f"Viewed {entity_type} with id {entity_id}",
+            **self.request_info,
+        )
+        self.audit_repo.create(audit_data)
+
+    def _calculate_changes(
+        self, old_values: Dict[str, Any], new_values: Dict[str, Any]
+    ) -> Dict[str, Dict[str, Any]]:
+        """Calculate the differences between old and new values."""
+        changes = {}
+        all_keys = set(old_values.keys()) | set(new_values.keys())
+        
+        for key in all_keys:
+            old_val = old_values.get(key)
+            new_val = new_values.get(key)
+            
+            if old_val != new_val:
+                changes[key] = {
+                    "old": old_val,
+                    "new": new_val,
+                }
+        
+        return changes

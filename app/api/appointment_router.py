@@ -13,16 +13,19 @@ from app.repositories.barber_repository import BarberRepository
 from app.repositories.service_repository import ServiceRepository
 from app.repositories.barbershop_schedule_repository import BarberShopScheduleRepository
 from app.repositories.barber_schedule_repository import BarberScheduleRepository
+from app.repositories.audit_log_repository import AuditLogRepository
 from app.services.appointment_service import AppointmentService
 from app.core.logging import get_logger
+from app.core.audit_middleware import get_request_info
 
 logger = get_logger(__name__)
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
-def get_appointment_service(db: Session):
+def get_appointment_service(request: Request, db: Session = Depends(get_db)):
     """Factory function to create AppointmentService with all dependencies."""
+    request_info = get_request_info(request)
     return AppointmentService(
         appointment_repo=AppointmentRepository(db),
         barbershop_repo=BarberShopRepository(db),
@@ -31,6 +34,8 @@ def get_appointment_service(db: Session):
         service_repo=ServiceRepository(db),
         barbershop_schedule_repo=BarberShopScheduleRepository(db),
         barber_schedule_repo=BarberScheduleRepository(db),
+        audit_repo=AuditLogRepository(db),
+        request_info=request_info,
     )
 
 
@@ -39,11 +44,10 @@ def get_appointment_service(db: Session):
 def create_appointment(
     request: Request,
     appointment_in: AppointmentCreate,
-    db: Session = Depends(get_db),
+    appointment_service: AppointmentService = Depends(get_appointment_service),
 ):
     """Create a new appointment."""
     logger.info(f"Creating appointment for barbershop {appointment_in.barbershop_id}")
-    appointment_service = get_appointment_service(db)
     return appointment_service.create_appointment(appointment_in)
 
 
@@ -52,10 +56,9 @@ def create_appointment(
 def get_appointment(
     request: Request,
     appointment_id: int,
-    db: Session = Depends(get_db),
+    appointment_service: AppointmentService = Depends(get_appointment_service),
 ):
     """Get an appointment by ID."""
-    appointment_service = get_appointment_service(db)
     return appointment_service.get_appointment(appointment_id)
 
 
@@ -65,10 +68,9 @@ def get_barbershop_appointments(
     request: Request,
     barbershop_id: int,
     status: str = Query(None, description="Filter by status"),
-    db: Session = Depends(get_db),
+    appointment_service: AppointmentService = Depends(get_appointment_service),
 ):
     """Get all appointments for a barbershop."""
-    appointment_service = get_appointment_service(db)
     return appointment_service.get_barbershop_appointments(barbershop_id, status)
 
 
@@ -77,10 +79,9 @@ def get_barbershop_appointments(
 def get_customer_appointments(
     request: Request,
     customer_id: int,
-    db: Session = Depends(get_db),
+    appointment_service: AppointmentService = Depends(get_appointment_service),
 ):
     """Get all appointments for a customer."""
-    appointment_service = get_appointment_service(db)
     return appointment_service.get_customer_appointments(customer_id)
 
 
@@ -89,10 +90,9 @@ def get_customer_appointments(
 def get_barber_appointments(
     request: Request,
     barber_id: int,
-    db: Session = Depends(get_db),
+    appointment_service: AppointmentService = Depends(get_appointment_service),
 ):
     """Get all appointments for a barber."""
-    appointment_service = get_appointment_service(db)
     return appointment_service.get_barber_appointments(barber_id)
 
 
@@ -102,10 +102,9 @@ def update_appointment(
     request: Request,
     appointment_id: int,
     appointment_in: AppointmentUpdate,
-    db: Session = Depends(get_db),
+    appointment_service: AppointmentService = Depends(get_appointment_service),
 ):
     """Update an appointment."""
-    appointment_service = get_appointment_service(db)
     return appointment_service.update_appointment(appointment_id, appointment_in)
 
 
@@ -114,9 +113,8 @@ def update_appointment(
 def delete_appointment(
     request: Request,
     appointment_id: int,
-    db: Session = Depends(get_db),
+    appointment_service: AppointmentService = Depends(get_appointment_service),
 ):
     """Delete an appointment."""
-    appointment_service = get_appointment_service(db)
     appointment_service.delete_appointment(appointment_id)
     return {"message": "Appointment deleted successfully"}
