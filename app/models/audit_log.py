@@ -1,7 +1,6 @@
 """Audit log model for tracking all operations."""
-from sqlalchemy import Column, Integer, String, DateTime, Text, JSON, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, JSON, ForeignKey
 from sqlalchemy.orm import relationship
-from datetime import datetime
 
 from app.db.base_class import Base
 
@@ -10,6 +9,7 @@ class AuditLog(Base):
     """Model for storing audit logs of all operations."""
     __tablename__ = "audit_logs"
 
+    # Explicitly define id (even though it's in Base, we need it for the mapper)
     id = Column(Integer, primary_key=True, index=True)
     
     # User information
@@ -34,9 +34,6 @@ class AuditLog(Base):
     
     # Additional context
     description = Column(Text, nullable=True)
-    
-    # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationship
     user = relationship("User", backref="audit_logs")
