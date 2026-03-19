@@ -5,8 +5,11 @@ def test_read_root(client):
     response = client.get("/")
     assert response.status_code == 200
     data = response.json()
-    assert data["status"] == "ok"
-    assert "Barber CRM API is running" in data["message"]
+    assert data["status"] == "running"
+    assert "name" in data
+    assert "version" in data
+    assert "docs" in data
+    assert "health" in data
 
 
 def test_get_db_dependency(client):
